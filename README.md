@@ -40,8 +40,10 @@ git clone https://github.com/August1996/mcp-akshare.git
 ```
 
 ## 贡献
+更多接口参考：https://akshare.akfamily.xyz/data/stock/stock.html
+欢迎新增更多实用的数据接口提交Pull Request或Issue
 
-欢迎提交Pull Request或Issue
+
 
 ## 许可证
 
