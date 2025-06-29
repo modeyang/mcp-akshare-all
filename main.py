@@ -16,7 +16,7 @@ import datetime
 MAX_DATA_ROW = 50
 
 # 创建MCP服务器实例
-mcp = FastMCP("AKShare股票数据服务", dependencies=["akshare>=1.16.76"])
+mcp = FastMCP("AKShare股票期货数据服务", dependencies=["akshare>=1.16.76"])
 # 工具函数：获取当前时间
 @mcp.tool()
 def get_current_time() -> dict:
@@ -29,6 +29,22 @@ def get_current_time() -> dict:
     """
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return {"current_time": current_time}
+
+# 工具函数：股票交易日历查询
+@mcp.tool()
+def stock_trade_date_hist() -> dict:
+    """获取股票交易日历数据
+    
+    数据来源: 新浪财经-交易日历
+    网址: https://finance.sina.com.cn/
+    
+    Returns:
+        dict: 包含股票交易日历数据的字典，包括从1990-12-19到当前的所有交易日期
+    """
+    result = ak.tool_trade_date_hist_sina()
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
 
 # 工具函数：上海证券交易所股票数据总貌
 @mcp.tool()
@@ -504,8 +520,271 @@ def stock_us_spot_em() -> dict:
         result = result[:min(MAX_DATA_ROW, len(result))]
     return result.to_dict(orient="records")
 
+# ==================== 期货市场相关工具函数 ====================
+
+# 工具函数：期货实时行情数据
+@mcp.tool()
+def futures_zh_spot(symbol: str, market: str = "CF", adjust: str = "0") -> dict:
+    """获取期货实时行情数据
+    
+    数据来源: 新浪财经-期货页面的实时行情数据
+    网址: https://finance.sina.com.cn/futuremarket/
+    
+    Args:
+        symbol: 期货合约代码，如"V2205"(单品种)或"V2205,P2205,B2201,M2205"(多品种，逗号分隔)
+        market: 市场类型，可选值: "CF"(商品期货), "FF"(金融期货)
+        adjust: 调整参数，默认"0"
+        
+    Returns:
+        dict: 包含期货实时行情数据的字典，包括开盘价、最高价、最低价、现价、成交量等
+    """
+    result = ak.futures_zh_spot(symbol=symbol, market=market, adjust=adjust)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：期货主力合约匹配
+@mcp.tool()
+def match_main_contract(symbol: str) -> str:
+    """获取期货主力合约代码
+    
+    数据来源: AKShare内置函数
+    
+    Args:
+        symbol: 交易所代码，可选值: 
+               "dce"(大连商品交易所), 
+               "czce"(郑州商品交易所), 
+               "shfe"(上海期货交易所),
+               "gfex"(广州期货交易所),
+               "cffex"(中国金融期货交易所)
+        
+    Returns:
+        str: 主力合约代码字符串，多个合约用逗号分隔
+    """
+    result = ak.match_main_contract(symbol=symbol)
+    return {"main_contracts": result}
+
+# 工具函数：期货交易费用参照表
+@mcp.tool()
+def futures_fees_info() -> dict:
+    """获取期货交易费用参照表
+    
+    数据来源: openctp 期货交易费用参照表
+    网址: http://openctp.cn/fees.html
+    
+    Returns:
+        dict: 包含期货交易费用数据的字典，包括交易所、合约代码、手续费等信息
+    """
+    result = ak.futures_fees_info()
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：期货手续费与保证金
+@mcp.tool()
+def futures_comm_info(symbol: str = "所有") -> dict:
+    """获取期货手续费与保证金数据
+    
+    数据来源: 九期网-期货手续费数据
+    网址: https://www.9qihuo.com/qihuoshouxufei
+    
+    Args:
+        symbol: 查询类型，可选值: "所有"(默认)或具体合约代码
+        
+    Returns:
+        dict: 包含期货手续费与保证金数据的字典，包括交易所名称、合约名称、手续费等
+    """
+    result = ak.futures_comm_info(symbol=symbol)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：期货规则-交易日历表
+@mcp.tool()
+def futures_rule(date: str) -> dict:
+    """获取期货规则-交易日历表数据
+    
+    数据来源: 国泰君安期货-交易日历数据表
+    网址: https://www.gtjaqh.com/pc/calendar.html
+    
+    Args:
+        date: 交易日期，格式为YYYYMMDD，如"20231205"
+        
+    Returns:
+        dict: 包含指定交易日所有合约的交易日历数据的字典
+    """
+    result = ak.futures_rule(date=date)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：期货现期图数据
+@mcp.tool()
+def futures_spot_sys(symbol: str, indicator: str) -> dict:
+    """获取期货现期图数据
+    
+    数据来源: 生意社-商品与期货-现期图
+    网址: https://www.100ppi.com/sf/792.html
+    
+    Args:
+        symbol: 品种名称，如"铜"
+        indicator: 指标类型，可选值: "市场价格", "基差率", "主力基差"
+        
+    Returns:
+        dict: 包含现期图数据的字典，根据指标类型返回相应数据
+    """
+    result = ak.futures_spot_sys(symbol=symbol, indicator=indicator)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：上海期货交易所合约信息
+@mcp.tool()
+def futures_contract_info_shfe(date: str) -> dict:
+    """获取上海期货交易所合约信息
+    
+    数据来源: 上海期货交易所-交易所服务-业务数据-交易参数汇总查询
+    网址: https://tsite.shfe.com.cn/bourseService/businessdata/summaryinquiry/
+    
+    Args:
+        date: 查询日期，格式为YYYYMMDD，如"20240513"
+        
+    Returns:
+        dict: 包含上海期货交易所合约信息数据的字典
+    """
+    result = ak.futures_contract_info_shfe(date=date)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：大连商品交易所合约信息
+@mcp.tool()
+def futures_contract_info_dce() -> dict:
+    """获取大连商品交易所合约信息
+    
+    数据来源: 大连商品交易所-业务/服务-业务参数-交易参数-合约信息查询
+    网址: http://www.dce.com.cn/dalianshangpin/ywfw/ywcs/jycs/hyxxcx/index.html
+    
+    Returns:
+        dict: 包含大连商品交易所最近交易日的期货合约信息数据的字典
+    """
+    result = ak.futures_contract_info_dce()
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：郑州商品交易所合约信息
+@mcp.tool()
+def futures_contract_info_czce(date: str) -> dict:
+    """获取郑州商品交易所合约信息
+    
+    数据来源: 郑州商品交易所-交易数据-参考数据
+    网址: http://www.czce.com.cn/cn/jysj/cksj/H770322index_1.htm
+    
+    Args:
+        date: 查询日期，格式为YYYYMMDD，如"20240228"
+        
+    Returns:
+        dict: 包含郑州商品交易所合约信息数据的字典
+    """
+    result = ak.futures_contract_info_czce(date=date)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：中国金融期货交易所合约信息
+@mcp.tool()
+def futures_contract_info_cffex(date: str) -> dict:
+    """获取中国金融期货交易所合约信息
+    
+    数据来源: 中国金融期货交易所-数据-交易参数
+    网址: http://www.gfex.com.cn/gfex/hyxx/ywcs.shtml
+    
+    Args:
+        date: 查询日期，格式为YYYYMMDD，如"20240228"
+        
+    Returns:
+        dict: 包含中国金融期货交易所合约信息数据的字典
+    """
+    result = ak.futures_contract_info_cffex(date=date)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：外盘期货品种代码表
+@mcp.tool()
+def futures_hq_subscribe_exchange_symbol() -> dict:
+    """获取外盘期货品种代码表
+    
+    数据来源: 新浪财经-外盘商品期货品种代码表数据
+    网址: https://finance.sina.com.cn/money/future/hf.html
+    
+    Returns:
+        dict: 包含外盘期货品种代码表数据的字典
+    """
+    result = ak.futures_hq_subscribe_exchange_symbol()
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：外盘期货实时行情数据
+@mcp.tool()
+def futures_foreign_commodity_realtime(symbol: str) -> dict:
+    """获取外盘期货实时行情数据
+    
+    数据来源: 新浪财经-外盘商品期货数据
+    网址: https://finance.sina.com.cn/money/future/hf.html
+    
+    Args:
+        symbol: 期货品种代码，如"CT,NID"(多个用逗号分隔)或列表格式
+        
+    Returns:
+        dict: 包含外盘期货实时行情数据的字典
+    """
+    result = ak.futures_foreign_commodity_realtime(symbol=symbol)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：国际期货实时行情数据-东财
+@mcp.tool()
+def futures_global_spot_em() -> dict:
+    """获取国际期货实时行情数据
+    
+    数据来源: 东方财富网-行情中心-期货市场-国际期货-实时行情数据
+    网址: https://quote.eastmoney.com/center/gridlist.html#futures_global
+    
+    Returns:
+        dict: 包含所有国际期货品种的实时行情数据的字典
+    """
+    result = ak.futures_global_spot_em()
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
+# 工具函数：期货资讯-上海金属网快讯
+@mcp.tool()
+def futures_news_shmet(symbol: str) -> dict:
+    """获取期货资讯-上海金属网快讯
+    
+    数据来源: 上海金属网-快讯
+    网址: https://www.shmet.com/newsFlash/newsFlash.html?searchKeyword=
+    
+    Args:
+        symbol: 查询关键词，如"铜"
+        
+    Returns:
+        dict: 包含期货资讯快讯数据的字典，包括发布时间、内容等
+    """
+    result = ak.futures_news_shmet(symbol=symbol)
+    if type(result) is pandas.core.frame.DataFrame:
+        result = result[:min(MAX_DATA_ROW, len(result))]
+    return result.to_dict(orient="records")
+
 def main():
-    mcp.run()
+    """启动MCP服务器"""
+    # 使用默认的stdio传输协议启动服务器
+    mcp.run(transport="http",port=9000)
 
 # 主函数
 if __name__ == "__main__":
